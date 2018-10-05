@@ -10,6 +10,8 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server); 
 
+io.listen(3001);
+
 // END CONFIG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 let interval;
@@ -27,10 +29,14 @@ io.on("connection", socket => {
   if (interval) {
     clearInterval(interval);
   }
-
-  interval = setInterval(() => getApiAndEmit(socket), 100);
+  socket.on("get quote", (ticker) => {
+        console.log("ticker received in backend: " + ticker);
+        interval = setInterval(() => getStockPriceAndEmit(socket, ticker), 100);
+  })
+  //interval = setInterval(() => getApiAndEmit(socket), 100);
 
   socket.on("disconnect", () => {
+      clearInterval(interval);
     console.log("Client disconnected");
   });
 });
@@ -44,11 +50,11 @@ server.listen(port, () => console.log(`Listening on port ${port}`));
 //That way, when we call getStockPrice(), we can use the await keyword inside the function
 //to truly map the data tha we get back to res.
 //without await, res wont wait for getStockPrice to return its value.
-const getApiAndEmit = async socket => {
+const getStockPriceAndEmit = async (socket, ticker) => {
     try {
-      const res = await getStockPrice('aapl'); // Getting the data from DarkSky
+      const res = await getStockPrice(ticker); // Getting the data from DarkSky
       console.log(res);
-      socket.emit("FromAPI", res); // Emitting a new message to the client
+      socket.emit("stock price", res); // Emitting a new message to the client
 
     } catch (error) {
       console.error(`Error: ${error.code}`);
