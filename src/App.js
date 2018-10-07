@@ -12,7 +12,7 @@ var userObj = {
   watchlist: [], //what stocks is the user interested in
   portfolio: [{}], //object of stocks the user owns that carries information (detailed below)
   cash: 10000,   //$10,000 to start with 
-  portfolioValue: 0, //total value of all stocks + cash not invested
+  portfolioValue: 10000, //total value of all stocks + cash not invested
   username: "",
   email: "",
   friends: ["john@doe.com", "mary@jane.com"], 
@@ -32,7 +32,7 @@ class User {
     this.name = name;
     this.watchlist = [];
     this.cash = 10000;
-    this.portfolio = [{}];
+    this.portfolio = [];
     this.portfolioValue = 10000;
     this.country = "";
     this.transactionHistory = [{}];
@@ -57,6 +57,24 @@ class StockPrice extends Component {
   }
 }
 
+class ShowPortfolio extends Component {
+  render() {
+   var portfolio = this.props.portfolio;
+   var portfolioList = [];
+
+   portfolio.forEach((stock) => {
+      portfolioList.push(<li>{"Ticker: " + stock.ticker + " Shares owned: " + stock.shares}</li>);
+   });
+
+    return (
+      <div>
+        {portfolioList}
+      </div>
+      
+    );
+  }
+}
+
 class App extends Component {
   constructor(props){
       super(props);
@@ -65,7 +83,8 @@ class App extends Component {
         endpoint: "http://127.0.0.1:3000",
         value: "",
         ticker: "",
-        amountOfShares: 0
+        amountOfShares: 0,
+        showPortfolio: false
       }
   }
 
@@ -75,18 +94,16 @@ class App extends Component {
 
   handleBuy(event){
       event.preventDefault();
-      console.log(event);
+
       var { response, ticker, amountOfShares } = this.state; //price
       console.log("amount of shares: " + amountOfShares);
 
       const { endpoint } = this.state;
       const socket = io(endpoint);
+      Patrick.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
 
-      // socket.emit("buy stock", ticker);
-      // socket.on("recieve stock price", price => {
-          Patrick.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
-          console.log("Patrick's portfolio: ")
-          console.log(Patrick.portfolio);
+      console.log("Patrick's portfolio: ")
+      console.log(Patrick.portfolio);
   
       
   }
@@ -94,6 +111,11 @@ class App extends Component {
   handleBuyChange(event){
       //need to do this to access event.target.value through handleBuy
       this.setState({amountOfShares: event.target.value});
+  }
+
+  handleShowPortfolio(event){
+    event.preventDefault();
+    this.setState({showPortfolio: true});
   }
 
   handleChange(event){
@@ -117,7 +139,8 @@ class App extends Component {
     //directly store the response value in a response variable.
     //This is what we'll pass in the <StockPrice> component
 
-    var { response } = this.state;
+    var { response, showPortfolio } = this.state;
+    console.log("portfolio response " + showPortfolio);
     console.log("Value before rendering" + response);
    
     return (
@@ -140,7 +163,11 @@ class App extends Component {
           
           <button onClick={() => this.handleSell}> Sell </button>
 
-          {/* <ShowPortfolio user={Patrick}/> */}
+          <form onSubmit={(event) => this.handleShowPortfolio(event)}>
+            <input type="submit" value="Show Portfolio" />
+          </form>
+
+          {showPortfolio ? <ShowPortfolio portfolio={Patrick.portfolio}/> : <span>Click button above to show portfolio</span>}
 
       </div>
     );
