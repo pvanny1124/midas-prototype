@@ -75,6 +75,17 @@ class ShowPortfolio extends Component {
   }
 }
 
+class ShowCashValue extends Component {
+  render(){
+    var cashValue = this.props.cashValue;
+    return (
+      <div>
+        <span>{cashValue}</span>
+      </div>
+    );
+  }
+}
+
 class App extends Component {
   constructor(props){
       super(props);
@@ -84,7 +95,8 @@ class App extends Component {
         value: "",
         ticker: "",
         amountOfShares: 0,
-        showPortfolio: false
+        showPortfolio: false,
+        buyFailed: false
       }
   }
 
@@ -95,12 +107,32 @@ class App extends Component {
   handleBuy(event){
       event.preventDefault();
 
-      var { response, ticker, amountOfShares } = this.state; //price
-      console.log("amount of shares: " + amountOfShares);
-
+      var { response, ticker, amountOfShares } = this.state;
       const { endpoint } = this.state;
       const socket = io(endpoint);
-      Patrick.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
+
+      var totalCostOfShares = response * amountOfShares;
+
+      //If the user has enough cash..
+      if((Patrick.cash - totalCostOfShares) > 0){
+          //Check if we already own the stock
+          for(let stock of Patrick.portfolio){
+            if(stock.ticker == ticker) {
+              stock.shares = parseInt(stock.shares) + parseInt(amountOfShares);
+              Patrick.cash = Patrick.cash - totalCostOfShares;
+              this.setState({buyFailed: false});
+              return;
+            }
+          }
+
+          //If the user doesn't own any of that particular stock
+          Patrick.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
+          Patrick.cash = Patrick.cash - totalCostOfShares;
+          this.setState({buyFailed: false});
+      } else {
+          this.setState({buyFailed: true});
+      }
+     
 
       console.log("Patrick's portfolio: ")
       console.log(Patrick.portfolio);
@@ -139,7 +171,7 @@ class App extends Component {
     //directly store the response value in a response variable.
     //This is what we'll pass in the <StockPrice> component
 
-    var { response, showPortfolio } = this.state;
+    var { response, showPortfolio, buyFailed } = this.state;
     console.log("portfolio response " + showPortfolio);
     console.log("Value before rendering" + response);
    
@@ -160,7 +192,8 @@ class App extends Component {
             <input type="text" placeholder="x amount of shares" onChange={(event) => this.handleBuyChange(event)}/>
             <input type="submit" value="Submit" />
           </form>
-          
+
+          {buyFailed ? <div><span>Buy unsuccessful. Not enough cash.</span></div> : <span></span>}
           <button onClick={() => this.handleSell}> Sell </button>
 
           <form onSubmit={(event) => this.handleShowPortfolio(event)}>
@@ -168,7 +201,7 @@ class App extends Component {
           </form>
 
           {showPortfolio ? <ShowPortfolio portfolio={Patrick.portfolio}/> : <span>Click button above to show portfolio</span>}
-
+          {showPortfolio ? <ShowCashValue cashValue={Patrick.cash} /> : <span>Click button above to see portfolio value</span>}
       </div>
     );
   }
