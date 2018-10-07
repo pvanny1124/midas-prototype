@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server); 
 
-io.listen(3001);
+// io.listen(3001);
 
 // END CONFIG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -35,6 +35,11 @@ io.on("connection", socket => {
   })
   //interval = setInterval(() => getApiAndEmit(socket), 100);
 
+  socket.on("buy stock", (ticker) => {
+      console.log("getting stock price in backend for" + ticker);
+      getStockPriceAndEmitForBuyOperation(socket, ticker);
+  });
+
   socket.on("disconnect", () => {
       clearInterval(interval);
     console.log("Client disconnected");
@@ -55,6 +60,18 @@ const getStockPriceAndEmit = async (socket, ticker) => {
       const res = await getStockPrice(ticker); // Getting the data from DarkSky
       console.log(res);
       socket.emit("stock price", res); // Emitting a new message to the client
+
+    } catch (error) {
+      console.error(`Error: ${error.code}`);
+    }
+  };
+
+
+  const getStockPriceAndEmitForBuyOperation = async (socket, ticker) => {
+    try {
+      const res = await getStockPrice(ticker); // Getting the data from DarkSky
+      console.log(res);
+      socket.emit("recieve stock price", res); // Emitting a new message to the client
 
     } catch (error) {
       console.error(`Error: ${error.code}`);

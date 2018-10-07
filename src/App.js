@@ -5,11 +5,51 @@ import './App.css';
 var fetch = require('isomorphic-fetch');
 var io = require('socket.io-client');
 
+
 const socket = io();
+
+var userObj = {
+  watchlist: [], //what stocks is the user interested in
+  portfolio: [{}], //object of stocks the user owns that carries information (detailed below)
+  cash: 10000,   //$10,000 to start with 
+  portfolioValue: 0, //total value of all stocks + cash not invested
+  username: "",
+  email: "",
+  friends: ["john@doe.com", "mary@jane.com"], 
+  userId: 0,
+  age: 23,
+  country: "USA",
+  jobTitle: "student", //or software engineer wink wink.
+  investingType: "trader", //or investor 
+  hasMidasTouch: false, //do you have a bigger portfolio value than your friends?
+  transactionHistory: [{}] //history of buy/sell orders
+  //etc
+}
+
+class User {
+  constructor(name, age, username, jobTitle, country){
+    this.username = username;
+    this.name = name;
+    this.watchlist = [];
+    this.cash = 10000;
+    this.portfolio = [{}];
+    this.portfolioValue = 10000;
+    this.country = "";
+    this.transactionHistory = [{}];
+    this.jobTitle = jobTitle;
+    this.userId = 0;
+    this.country = country;
+    this.friends = [{}];
+  }
+}
+
+//Dummy variable
+var Patrick = new User("Patrick", 23, "pvanny1124", "student", "USA");
+// console.log(Patrick.portfolio)
+
 
 //StockPrice renders the stockprice
 class StockPrice extends Component {
-
   render() {
     return (
       <li>{this.props.stockPrice}</li>
@@ -17,14 +57,15 @@ class StockPrice extends Component {
   }
 }
 
-
 class App extends Component {
   constructor(props){
       super(props);
       this.state = {
         response: false,
         endpoint: "http://127.0.0.1:3000",
-        value: ""
+        value: "",
+        ticker: "",
+        amountOfShares: 0
       }
   }
 
@@ -32,6 +73,28 @@ class App extends Component {
   //componentDidMount just sets up our connection to socketio again through our socket
   //And we set the response in state to the new data that was emitted from the server
 
+  handleBuy(event){
+      event.preventDefault();
+      console.log(event);
+      var { response, ticker, amountOfShares } = this.state; //price
+      console.log("amount of shares: " + amountOfShares);
+
+      const { endpoint } = this.state;
+      const socket = io(endpoint);
+
+      // socket.emit("buy stock", ticker);
+      // socket.on("recieve stock price", price => {
+          Patrick.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
+          console.log("Patrick's portfolio: ")
+          console.log(Patrick.portfolio);
+  
+      
+  }
+
+  handleBuyChange(event){
+      //need to do this to access event.target.value through handleBuy
+      this.setState({amountOfShares: event.target.value});
+  }
 
   handleChange(event){
       this.setState({
@@ -45,14 +108,8 @@ class App extends Component {
     const { endpoint } = this.state;
     const socket = io(endpoint);
     socket.emit('get quote', this.state.value); //works
-    socket.on("stock price", data => this.setState({ response: data }));
+    socket.on("stock price", data => this.setState({ ticker: this.state.value, response: data }));
   }
-
-  // mountSocket() {
-  //   const { endpoint } = this.state;
-  //   const socket = io(endpoint);
-  //   socket.on("stock price", data => this.setState({ response: data }));
-  // }
 
   render() {
   
@@ -62,7 +119,7 @@ class App extends Component {
 
     var { response } = this.state;
     console.log("Value before rendering" + response);
-
+   
     return (
       <div className="App">
         <p>Get Realtime Stock Price:</p>
@@ -70,10 +127,26 @@ class App extends Component {
             <input type="text"  placeholder="msft" onChange={(event) => this.handleChange(event)}/>
             <input type="submit" value="Submit" />
           </form>
-          {response ? <StockPrice stockPrice={response} /> : <span>No information available yet</span> }
+
+          {/*Return StockPrice if we get a response back from the server*/}
+           {response ? <StockPrice stockPrice={response} /> : <span>No information available yet</span> }
+
+          {/*Buy/Sell buttons*/}
+          <form onSubmit={(event) => this.handleBuy(event)}>
+            <label for="buy">Buy</label>
+            <input type="text" placeholder="x amount of shares" onChange={(event) => this.handleBuyChange(event)}/>
+            <input type="submit" value="Submit" />
+          </form>
+          
+          <button onClick={() => this.handleSell}> Sell </button>
+
+          {/* <ShowPortfolio user={Patrick}/> */}
+
       </div>
     );
   }
+
 }
+
 
 export default App;
