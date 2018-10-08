@@ -10,7 +10,8 @@ var bodyParser      = require('body-parser');
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(function(req, res, next) {  
-  //Following is needed to allow a fetch put request to work on the client side
+  //Following is needed to allow a fetch put request to work on the client side:
+
     // Website you wish to allow to connect
     var allowedOrigins = ['http://127.0.0.1:3001', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://localhost:3000'];
     var origin = req.headers.origin;
@@ -29,7 +30,9 @@ app.use(function(req, res, next) {
 });  
 
 //Connect to mlab database
-const database_url = "mongodb://patrickv:swaggy1124@ds119350.mlab.com:19350/midas-prototype"
+var databaseUser = process.env.USER;
+var databaseUserPassword = process.env.PASSWORD;
+const database_url = `mongodb://${databaseUser}:${databaseUserPassword}@ds119350.mlab.com:19350/midas-prototype`;
 mongoose.connect(database_url);
 mongoose.Promise = Promise;
 
