@@ -1,10 +1,40 @@
-const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const fetch = require('isomorphic-fetch');
+const express       = require("express");
+const http          = require("http");
+const socketIo      = require("socket.io");
+const fetch         = require('isomorphic-fetch');
+const mongoose      = require('mongoose');
+const app           = express();
+var User            = require('../models/UserSchema');
+var bodyParser      = require('body-parser');
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(function(req, res, next) {  
+  //Following is needed to allow a fetch put request to work on the client side
+    // Website you wish to allow to connect
+    var allowedOrigins = ['http://127.0.0.1:3001', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://localhost:3000'];
+    var origin = req.headers.origin;
+    if(allowedOrigins.indexOf(origin) > -1){
+         res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    // Request methods you wish to allow
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    // Request headers you wish to allow
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+    // Set to true if you need the website to include cookies in the requests sent
+    // to the API (e.g. in case you use sessions)
+    res.setHeader('Access-Control-Allow-Credentials', true);
+
+    next();
+});  
+
+//Connect to mlab database
+const database_url = "mongodb://patrickv:swaggy1124@ds119350.mlab.com:19350/midas-prototype"
+mongoose.connect(database_url);
+mongoose.Promise = Promise;
+
 
 const port = 3000;
-const app = express();
 
 //SocketIO mounting
 const server = http.createServer(app);
@@ -23,8 +53,31 @@ let interval;
 //then we use clearInterval and pass in interval to stop the timer.
 //clearInterval is a pre-defined function from js.
 
+
+app.get("/api/user", function(req, res){
+    User.findOne({firstName: "Patrick"})
+        .then((user) => {
+          res.json(user);
+        })
+        .catch((err) => {
+          res.send(err);
+        })
+});
+
+app.put("/api/user/:id", function(req, res){
+    User.update({_id: req.body._id}, {_id: req.body._id, portfolio: req.body.portfolio, cash: req.body.cash})
+        .then((user) => {
+          res.json(user);
+        })
+        .catch((err) => {
+          res.send(err);
+        });
+});
+
 io.on("connection", socket => {
   console.log("New client connected");
+
+  
 
   if (interval) {
     clearInterval(interval);

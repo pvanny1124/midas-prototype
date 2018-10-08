@@ -8,44 +8,23 @@ var io = require('socket.io-client');
 
 const socket = io();
 
-var userObj = {
-  watchlist: [], //what stocks is the user interested in
-  portfolio: [{}], //object of stocks the user owns that carries information (detailed below)
-  cash: 10000,   //$10,000 to start with 
-  portfolioValue: 10000, //total value of all stocks + cash not invested
-  username: "",
-  email: "",
-  friends: ["john@doe.com", "mary@jane.com"], 
-  userId: 0,
-  age: 23,
-  country: "USA",
-  jobTitle: "student", //or software engineer wink wink.
-  investingType: "trader", //or investor 
-  hasMidasTouch: false, //do you have a bigger portfolio value than your friends?
-  transactionHistory: [{}] //history of buy/sell orders
-  //etc
-}
+// class User {
+//   constructor(name, age, username, jobTitle, country){
+//     this.username = username;
+//     this.name = name;
+//     this.watchlist = [];
+//     this.cash = 10000;
+//     this.portfolio = [];
+//     this.portfolioValue = 10000;
+//     this.country = "";
+//     this.transactionHistory = [{}];
+//     this.jobTitle = jobTitle;
+//     this.userId = 0;
+//     this.country = country;
+//     this.friends = [{}];
+//   }
+// }
 
-class User {
-  constructor(name, age, username, jobTitle, country){
-    this.username = username;
-    this.name = name;
-    this.watchlist = [];
-    this.cash = 10000;
-    this.portfolio = [];
-    this.portfolioValue = 10000;
-    this.country = "";
-    this.transactionHistory = [{}];
-    this.jobTitle = jobTitle;
-    this.userId = 0;
-    this.country = country;
-    this.friends = [{}];
-  }
-}
-
-//Dummy variable
-var Patrick = new User("Patrick", 23, "pvanny1124", "student", "USA");
-// console.log(Patrick.portfolio)
 
 
 //StockPrice renders the stockprice
@@ -96,7 +75,8 @@ class App extends Component {
         ticker: "",
         amountOfShares: 0,
         showPortfolio: false,
-        buyFailed: false
+        buyFailed: false,
+        user: {}
       }
   }
 
@@ -107,37 +87,59 @@ class App extends Component {
   handleBuy(event){
       event.preventDefault();
 
-      var { response, ticker, amountOfShares } = this.state;
+      var { response, ticker, amountOfShares, user } = this.state;
       const { endpoint } = this.state;
       const socket = io(endpoint);
 
       var totalCostOfShares = response * amountOfShares;
 
-      //If the user has enough cash..
-      if((Patrick.cash - totalCostOfShares) > 0){
-          //Check if we already own the stock
-          for(let stock of Patrick.portfolio){
+      //if user has no shares
+      if(isEmpty(user.portfolio)){
+
+        //TODO: Calculate average price brought
+        user.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
+        user.cash = user.cash - totalCostOfShares;
+
+        this.setState({user: user});
+        
+        updateUserPortfolio(user)
+            .catch((err) => {console.log(err)});
+
+        return;
+      }
+
+      //If the user has money to buy shares...
+      if((user.cash - totalCostOfShares) > 0){
+
+          //...Check if he/she already own the stock
+          for(let stock of user.portfolio){
+
             if(stock.ticker == ticker) {
+
               stock.shares = parseInt(stock.shares) + parseInt(amountOfShares);
-              Patrick.cash = Patrick.cash - totalCostOfShares;
-              this.setState({buyFailed: false});
+              user.cash = user.cash - totalCostOfShares;
+              this.setState({user: user, buyFailed: false});
+
+              //Update the users information
+              updateUserPortfolio(user)
+                    .catch((err) => {console.log(err)})
               return;
             }
           }
 
-          //If the user doesn't own any of that particular stock
-          Patrick.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
-          Patrick.cash = Patrick.cash - totalCostOfShares;
-          this.setState({buyFailed: false});
+          //If the user doesn't own any shares of the ticker...
+
+          user.portfolio.push({ticker: ticker, shares: amountOfShares, priceBought: response});
+          user.cash = user.cash - totalCostOfShares;
+        
+          this.setState({user: user, buyFailed: false});
+
+          updateUserPortfolio(user)
+              .catch((err) => {console.log(err)})
       } else {
           this.setState({buyFailed: true});
       }
-     
-
-      console.log("Patrick's portfolio: ")
-      console.log(Patrick.portfolio);
   
-      
   }
 
   handleBuyChange(event){
@@ -165,16 +167,31 @@ class App extends Component {
     socket.on("stock price", data => this.setState({ ticker: this.state.value, response: data }));
   }
 
+  componentWillMount(){
+        fetch("/api/user")
+                .then((response) => {
+                    console.log(response)
+                    return response.json();
+                })
+                .then((user) => {
+                    this.setState({user: user});
+                    console.log(user);
+                })
+                .catch((err) => {
+                  console.log(err);
+                });
+  }
+
   render() {
   
     //Using a little trick called object destructuring (es7 feauture), we can
     //directly store the response value in a response variable.
     //This is what we'll pass in the <StockPrice> component
 
-    var { response, showPortfolio, buyFailed } = this.state;
+    var { response, showPortfolio, buyFailed, user } = this.state;
     console.log("portfolio response " + showPortfolio);
     console.log("Value before rendering" + response);
-   
+
     return (
       <div className="App">
         <p>Get Realtime Stock Price:</p>
@@ -200,13 +217,32 @@ class App extends Component {
             <input type="submit" value="Show Portfolio" />
           </form>
 
-          {showPortfolio ? <ShowPortfolio portfolio={Patrick.portfolio}/> : <span>Click button above to show portfolio</span>}
-          {showPortfolio ? <ShowCashValue cashValue={Patrick.cash} /> : <span>Click button above to see portfolio value</span>}
+          {showPortfolio ? <ShowPortfolio portfolio={user.portfolio}/> : <span>Click button above to show portfolio</span>}
+          {showPortfolio ? <ShowCashValue cashValue={user.cash} /> : <span>Click button above to see portfolio value</span>}
       </div>
     );
   }
 
 }
 
+
+//Helper functions 
+function isEmpty(obj) {
+    for(var key in obj) {
+        if(obj.hasOwnProperty(key))
+            return false;
+    }
+    return true;
+}
+
+async function updateUserPortfolio(user) {
+     return fetch("http://localhost:3000/api/user/" + user._id, {
+        method: "put",
+        headers: new Headers({
+          'Content-Type': 'application/json'
+        }),
+        body: JSON.stringify({_id: user._id, portfolio: user.portfolio, cash: user.cash})
+      })
+}
 
 export default App;
