@@ -8,30 +8,11 @@ var io = require('socket.io-client');
 
 const socket = io();
 
-// class User {
-//   constructor(name, age, username, jobTitle, country){
-//     this.username = username;
-//     this.name = name;
-//     this.watchlist = [];
-//     this.cash = 10000;
-//     this.portfolio = [];
-//     this.portfolioValue = 10000;
-//     this.country = "";
-//     this.transactionHistory = [{}];
-//     this.jobTitle = jobTitle;
-//     this.userId = 0;
-//     this.country = country;
-//     this.friends = [{}];
-//   }
-// }
-
-
-
 //StockPrice renders the stockprice
 class StockPrice extends Component {
   render() {
     return (
-      <li>{this.props.stockPrice}</li>
+      <li>{"$" + this.props.stockPrice}</li>
     );
   }
 }
@@ -59,7 +40,7 @@ class ShowCashValue extends Component {
     var cashValue = this.props.cashValue;
     return (
       <div>
-        <span>{cashValue}</span>
+        <span>{"Cash on account: " + "$" + Math.round(100*cashValue)/100}</span>
       </div>
     );
   }
@@ -76,22 +57,21 @@ class App extends Component {
         amountOfShares: 0,
         showPortfolio: false,
         buyFailed: false,
+        sellFailed: false,
         user: {}
       }
   }
 
-  //This runs automatically when the App component is mounted
-  //componentDidMount just sets up our connection to socketio again through our socket
-  //And we set the response in state to the new data that was emitted from the server
-
   handleBuy(event){
       event.preventDefault();
 
-      var { response, ticker, amountOfShares, user } = this.state;
+      var { response, ticker, amountOfShares, user, value} = this.state;
       const { endpoint } = this.state;
       const socket = io(endpoint);
 
       var totalCostOfShares = response * amountOfShares;
+
+      if(value == "" || amountOfShares == "") return;
 
       //if user has no shares
       if(isEmpty(user.portfolio)){
@@ -142,8 +122,53 @@ class App extends Component {
   
   }
 
-  handleBuyChange(event){
-      //need to do this to access event.target.value through handleBuy
+  handleSell(event){
+      event.preventDefault();
+      
+      var { response, ticker, amountOfShares, user, sellResponse, value } = this.state;
+      const { endpoint } = this.state;
+      const socket = io(endpoint);
+
+      if(value == "" || amountOfShares == "") return;
+
+      getStockPrice(ticker)
+        .then((price) => {
+          if(isEmpty(user.portfolio)){
+            this.setState({sellFailed: true});
+          } else {
+                    //check if the user has the stock, and has more than or equal to x amount of shares to sell
+                   for(let stock of user.portfolio){
+                          if(stock.ticker == ticker){
+                              if(stock.shares >= parseInt(amountOfShares)){
+
+                                  //remove x amount of shares from ticker object in portfolio
+                                  stock.shares = parseInt(stock.shares) - parseInt(amountOfShares);
+
+                           
+                                  //add price x amount of shares to cash    
+                                  user.cash = user.cash + (parseInt(amountOfShares) * parseInt(price));
+
+                                  //Update user Portfolio on backend and on client
+                                  updateUserPortfolio(user)
+                                      .catch((err) => {console.log(err)});
+                                  this.setState({user: user, sellFailed: false});
+                                  break;
+                              } else {
+                                //if not enough shares,
+                                this.setState({sellFailed: true});
+                              }
+                          }
+                    }
+             
+        }
+
+        });
+        
+           
+  }
+
+  handleBuyAndSellChange(event){
+      //need to do this to access event.target.value through handleBuy/handleSell
       this.setState({amountOfShares: event.target.value});
   }
 
@@ -153,29 +178,38 @@ class App extends Component {
   }
 
   handleChange(event){
-      this.setState({
-        value: event.target.value.toLowerCase()
-      });
-      console.log(event.target.value);
+      var newValue = event.target.value.toLowerCase();
+    
+      if(newValue == "") {
+        this.setState({value: newValue, response: false})
+      } else {
+        this.setState({value: newValue});
+      }
   }
 
   handleSubmit(event) {
     event.preventDefault(); //prevent the form from opening another window
+
+    //socket config
     const { endpoint } = this.state;
     const socket = io(endpoint);
+
+    //if value in input is empty...
+    if(this.state.value == "") this.setState({value: "", response: false});
+
+    //get instant quote and update state
     socket.emit('get quote', this.state.value); //works
     socket.on("stock price", data => this.setState({ ticker: this.state.value, response: data }));
   }
 
+  //Store dummy user once the component first renders using the built in componentWillMount() react function.
   componentWillMount(){
         fetch("/api/user")
                 .then((response) => {
-                    console.log(response)
                     return response.json();
                 })
                 .then((user) => {
                     this.setState({user: user});
-                    console.log(user);
                 })
                 .catch((err) => {
                   console.log(err);
@@ -188,9 +222,9 @@ class App extends Component {
     //directly store the response value in a response variable.
     //This is what we'll pass in the <StockPrice> component
 
-    var { response, showPortfolio, buyFailed, user } = this.state;
-    console.log("portfolio response " + showPortfolio);
-    console.log("Value before rendering" + response);
+    var { response, showPortfolio, buyFailed, sellFailed, user } = this.state;
+    // console.log("portfolio response " + showPortfolio);
+    // console.log("Value before rendering" + response);
 
     return (
       <div className="App">
@@ -206,19 +240,27 @@ class App extends Component {
           {/*Buy/Sell buttons*/}
           <form onSubmit={(event) => this.handleBuy(event)}>
             <label for="buy">Buy</label>
-            <input type="text" placeholder="x amount of shares" onChange={(event) => this.handleBuyChange(event)}/>
+            <input type="text" placeholder="x amount of shares" onChange={(event) => this.handleBuyAndSellChange(event)}/>
             <input type="submit" value="Submit" />
           </form>
 
           {buyFailed ? <div><span>Buy unsuccessful. Not enough cash.</span></div> : <span></span>}
-          <button onClick={() => this.handleSell}> Sell </button>
+
+          <form onSubmit={(event) => this.handleSell(event)}>
+             <label for="buy">Sell</label>
+             <input type="text" placeholder="x amount of shares" onChange={(event) => this.handleBuyAndSellChange(event)}/>
+             <input type="submit" value="Submit" />
+          </form>
+
+          {sellFailed ? <div><span>Sell unsuccessful. Not enough shares to sell</span></div> : <span></span>}
 
           <form onSubmit={(event) => this.handleShowPortfolio(event)}>
             <input type="submit" value="Show Portfolio" />
           </form>
 
-          {showPortfolio ? <ShowPortfolio portfolio={user.portfolio}/> : <span>Click button above to show portfolio</span>}
           {showPortfolio ? <ShowCashValue cashValue={user.cash} /> : <span>Click button above to see portfolio value</span>}
+          {showPortfolio ? <ShowPortfolio portfolio={user.portfolio}/> : <span>Click button above to show portfolio</span>}
+
       </div>
     );
   }
@@ -242,6 +284,17 @@ async function updateUserPortfolio(user) {
           'Content-Type': 'application/json'
         }),
         body: JSON.stringify({_id: user._id, portfolio: user.portfolio, cash: user.cash})
+      })
+}
+
+
+function getStockPrice(ticker){
+  return fetch(`https://api.iextrading.com/1.0/stock/${ticker}/price`)
+      .then((response) => {
+          return response.json()
+      })
+      .then((data) => {
+          return data;
       })
 }
 

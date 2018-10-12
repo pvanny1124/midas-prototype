@@ -39,7 +39,6 @@ mongoose.Promise = Promise;
 
 const port = 3000;
 
-//SocketIO mounting
 const server = http.createServer(app);
 const io = socketIo(server); 
 
@@ -55,6 +54,10 @@ let interval;
 //and since its global, if its still running upon a new connection,
 //then we use clearInterval and pass in interval to stop the timer.
 //clearInterval is a pre-defined function from js.
+
+User.updateOne({firstName: "Patrick"}, {portfolio: []}).catch((err) => {
+  console.log(err);
+});
 
 
 app.get("/api/user", function(req, res){
@@ -77,10 +80,14 @@ app.put("/api/user/:id", function(req, res){
         });
 });
 
+
+
+
+
+
 io.on("connection", socket => {
   console.log("New client connected");
 
-  
 
   if (interval) {
     clearInterval(interval);
