@@ -61,6 +61,10 @@ User.findOne({firstName: "Patrick"}).then((data) => {
   console.log(data)
 })
 
+// User.updateOne({firstName: "Patrick"}, { $set: {portfolioValue: 0}}).then((data) => {
+//   console.log(data)
+// });
+
 /*******************************Routing Configuration*************************************/
 
 //main route to return our dummy data in json
@@ -115,19 +119,27 @@ io.on("connection", socket => {
           clearInterval(interval);
         }
             console.log("ticker received in backend: " + ticker);
-            interval = setInterval(() => getStockPriceAndEmit(socket, ticker), 1000);
+            interval = setInterval(() => getStockPriceAndEmit(socket, ticker), 100);
       })
 
       socket.on("buy stock", (ticker) => {
           console.log("getting stock price in backend for" + ticker);
           getStockPriceAndEmitForBuyOperation(socket, ticker);
       });
-
+      var count = 0;
+      var sumOfTimes = 0;
       socket.on("portfolio update", portfolio => {
+                 
             portfolioInterval = setInterval(async () => {
+                 
+                  count++;
+                  var timeNow = Date.now()
+                  
                   var newPortfolio = await updatePortfolioStockPrices();
+                  console.log("Time took to get data: " + (Date.now() - timeNow));
+                  sumOfTimes += (Date.now() - timeNow);
                   socket.emit("new portfolio", newPortfolio);
-            }, 3500)
+            }, 4000)
         
       });
 

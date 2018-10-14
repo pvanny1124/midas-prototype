@@ -77,6 +77,82 @@ class StockPrice extends Component {
    in state.
 
 */
+
+class PortfolioTicker extends Component {
+  constructor(props){
+      super(props);
+      this.state = {
+        price: 0,
+        shares: 0,
+        waitingForUpdate: false
+      }
+  }
+
+
+  render(){
+    var { ticker } = this.props;
+
+    if(!this.state.waitingForUpdate){
+      this.interval = setInterval(async () => {
+        var newPrice = await getStockPrice(ticker);
+        var user = await getUserPortfolio();
+        var userPortfolio = user.portfolio;
+        //console.log(userPortfolio);
+        var amountOfSharesOwned = 0;
+        for (let stock of userPortfolio){
+          if(stock.ticker == ticker){
+            amountOfSharesOwned = stock.shares;
+          }
+        }
+        //console.log("new price of: " + ticker + " is: "  + newPrice + " shares owned: " + amountOfSharesOwned);
+        this.setState({price: newPrice, shares: amountOfSharesOwned, waitingForUpdate: true});
+    }, 500);
+    }
+     
+    return (
+        <li>{"Ticker: " + ticker + " current price: " + this.state.price + " shares owned: " + this.state.shares}</li>
+
+    );
+  }
+}
+
+//ShowPortfolioValue would have to take in a user for main app
+class ShowPortfolioValue extends Component {
+  constructor(props){
+    super(props);
+    this.state = {
+      portfolioValue: 0,
+      waitingForUpdate: false
+    }
+  }
+
+  render(){
+
+    if(!this.state.waitingForUpdate){
+
+      this.interval = setInterval(async () => {
+        var totalPortfolioValue = 0;
+        var user = await getUserPortfolio();
+        totalPortfolioValue = parseInt(user.cash);
+
+       // console.log(user);
+        for(let stock of user.portfolio){
+              var newPriceOfStock = await getStockPrice(stock.ticker);
+              // console.log("new price of stock: " + newPriceOfStock);
+              // console.log("#shares: " + stock.shares);
+              totalPortfolioValue += (parseInt(stock.shares) * parseFloat(newPriceOfStock));
+        }
+
+        //console.log("portfolio value: " + totalPortfolioValue);
+        this.setState({portfolioValue: Math.round(100*totalPortfolioValue)/100, waitingForUpdate: true})
+       }, 500);
+      }
+    return (
+        <li>{"Total portfolio value: $" + this.state.portfolioValue}</li>
+    );
+  }
+}
+
 class ShowPortfolio extends Component {
   constructor(props){
     super(props);
@@ -84,54 +160,60 @@ class ShowPortfolio extends Component {
     this.state = {
       portfolio: {},
       portfolioList: [],
-      waitingForUpdate: false,
-      portfolioValue: 0,
+      waitingForUpdate: false
 
     }
   }
 
   render() {
    var { portfolio, cashValue } = this.props;
-   
 
-   console.log("waiting for update?: " + this.state.waitingForUpdate);
+   var portfolioList = [];
+
+   for(let stock of portfolio){
+        portfolioList.push(<PortfolioTicker ticker={stock.ticker}/>)
+   }
+  
+   //console.log("waiting for update?: " + this.state.waitingForUpdate);
 
    //Don't emit again after re-rendering
    //Don't place socket.on outside of this if statement or
    //else, after every render, a new socket.on function will be created
    //and multiply the amount of requests received.
-   if(!this.state.waitingForUpdate){
+  //  if(!this.state.waitingForUpdate){
      
       
-      socket.emit("portfolio update", portfolio);
+  //     socket.emit("portfolio update", portfolio);
    
-      socket.on("new portfolio", async newPortfolio => {  
-              var totalPortfolioValue = 0;
-              var portfolioList = [];
+  //     socket.on("new portfolio", async newPortfolio => {  
+  //             var totalPortfolioValue = 0;
+  //             var portfolioList = [];
 
-              //Debugging
-              console.log(newPortfolio);  
-              console.log(portfolioList);
+  //             //Debugging
+  //             console.log(newPortfolio);  
+  //             console.log(portfolioList);
 
-              var user = await getUserPortfolio();
-              var cashValue = user.cash;
-              totalPortfolioValue += cashValue;
+  //             var user = await getUserPortfolio();
+  //             var cashValue = user.cash;
+  //             totalPortfolioValue += cashValue;
 
-              for(let stock of newPortfolio) {
-                  totalPortfolioValue += (parseInt(stock.currentPrice) * parseInt(stock.shares));
-                  portfolioList.push(<li>{"Ticker: " + stock.ticker + " Shares owned: " + stock.shares + " Current Price: " + stock.currentPrice}</li>);
-              }
+  //             for(let stock of newPortfolio) {
+  //                 totalPortfolioValue += (parseInt(stock.currentPrice) * parseInt(stock.shares));
+  //                 portfolioList.push(<li>{"Ticker: " + stock.ticker + " Shares owned: " + stock.shares + " Current Price: " + stock.currentPrice}</li>);
+  //             }
 
-              this.setState({waitingForUpdate: true, portfolioList: portfolioList, portfolioValue: Math.round(100*totalPortfolioValue)/100});
+  //             this.setState({waitingForUpdate: true, portfolioList: portfolioList, portfolioValue: Math.round(100*totalPortfolioValue)/100});
           
-        });
-      }
+  //       });
+  //     }
    
 
     return (
       <div>
-        <div>{"Total Portfolio Value: $" + this.state.portfolioValue}</div>
-        {this.state.portfolioList}
+        {/* <div>{"Total Portfolio Value: $" + this.state.portfolioValue}</div>
+        {this.state.portfolioList} */}
+        <ShowPortfolioValue />
+        {portfolioList}
       </div>
       
     );
@@ -339,9 +421,9 @@ class App extends Component {
     var { response, showPortfolio, buyFailed, sellFailed, user } = this.state;
 
     //Debugging
-    console.log("portfolio response " + showPortfolio);
-    console.log("Value before rendering" + response);
-    console.log(this.state.showPortfolio);
+   // console.log("portfolio response " + showPortfolio);
+    //console.log("Value before rendering" + response);
+    //console.log(this.state.showPortfolio);
 
     return (
       <div className="App">

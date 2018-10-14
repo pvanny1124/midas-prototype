@@ -16,7 +16,7 @@ var UserSchema = new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     portfolio: [mongoose.Schema.Types.Mixed],
     cash: Number,
-
+    portfolioValue: Number
 });
 
 module.exports = mongoose.model("User", UserSchema);
